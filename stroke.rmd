@@ -1,0 +1,519 @@
+---
+title: "DATA MINING"
+author: "Trang Ha Quach"
+date: "6/8/2021"
+output: word_document
+---
+
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(gganimate)
+library(png)
+library(gifski)
+library(gapminder)
+library(arules)
+library(readr)
+library(knitr)
+stroke <- read.csv("E:/DATA MINING/stroke.csv")
+View(stroke)
+```
+
+# **I. GIỚI THIỆU BỘ DỮ LIỆU**   
+## ***1. Xem dữ liêụ***
+```{r, message=FALSE, warning=FALSE}
+kable(stroke[1:7, ], caption = "STROKE")
+```
+
+-- Giải thích các tên cột  
+**gender**: Giới tính (Male: Nam, Female: Nữ)  
+**age**: Tuổi  
+**hypertension**: Tiền sử bị bệnh cao huyết áp (0: no, 1: yes)    
+**heart_disease**: Tiền sử bị bệnh tim mạch (0: no, 1: yes)  
+**ever_married**: Tình trạng hôn nhân   
+**work_type**: Loại hình công việc (private: tư nhân, self-employed: tự kinh doanh, govt_job: nhà nước, never worked: chưa đi làm, children: trẻ em)  
+**residen type**: Khu vực sinh sống (rural: nông thôn, urban: thành thị)  
+**avg_glucose_level**: Hàm lượng glucose(đường) trong máu  
+**bmi**: Chỉ số thể trọng  
+**smoking_status**: Tình trạng hút thuốc(formerly:trước kia đã từng hút thuốc, never: chưa từng hút thuốc, smokes: đang hút thuốc, unknow: không biết)  
+**stroke**: Đã từng bị đột quỵ chưa (0: no, 1: yes)
+
+-- Số dòng (quan sát) và cột (biến) của dữ liệu 
+```{r message=FALSE, warning=FALSE}
+dim(stroke)
+```
+Như vậy, dữ liệu có 5110 quan sát và 12 biến tương ứng có 5110 dòng và 12 cột
+
+## ***2. Cấu trúc bộ dữ liệu***
+```{r message=TRUE, warning=FALSE}
+str(stroke)
+```
+Có 2 biến numeric: age, avg_glucose_level  
+Có 6 biến character: gender, ever_married, work_type, residence_type, smoking_status, bmi   
+Có 4 biến int: id, hypertension, heart_disease, stroke
+
+## ***3. Kiểm tra dữ liệu trống và xử lý dữ liệu***
+### *a. Kiểm tra dữ liệu trống*
+----- Chuyển dữ liệu cột bmi sang dạng numeric
+```{r message=FALSE, warning=FALSE}
+stroke$bmi <-  as.numeric(stroke$bmi)
+```
+
+-- Kiểm tra dữ liệu trống
+```{r message=FALSE, warning=FALSE}
+anyNA(stroke)
+```
+Bộ dữ liệu có dữ liệu trống
+
+-- Đếm số dữ liệu trống
+```{r message=FALSE, warning=FALSE}
+sum(is.na(stroke))
+```
+Có 201 dữ liệu trống 
+
+-- Đếm dữ liệu trống theo cột 
+```{r message=FALSE, warning=FALSE}
+colSums(is.na(stroke))
+```
+Duy nhất cột bmi có dữ liệu trống 
+
+-- Đếm dữ liệu trống theo dòng
+```{r message=FALSE, warning=FALSE}
+rowSums(is.na(stroke))
+```
+### *b. Xử lý dữ liệu trống*
+-- Xóa toàn bộ các quan sát có giá trị khuyết thiếu
+```{r message=FALSE, warning=FALSE}
+stroke1 <- drop_na(stroke)
+```
+
+-- Bảng tần số đơn của cột gender 
+```{r message=FALSE, warning=FALSE}
+table(stroke1 $gender)
+```
+cột gender có một giá trị "Other" khác với những giá trị còn lại, nhóm tiến hành loại bỏ giá trị này
+
+-- Xóa giá trị "Other"
+```{r message=FALSE, warning=FALSE}
+stroke2 <- subset(stroke1, gender != "Other")
+```
+-- Tại ba cột hypertension, heart_disease và stroke các giá trị đang hiện ở dạng  int '0,1' trong đó '0=no, 1=yes'; nhóm tiến hành chuyển sang dạng character 
+```{r message=FALSE, warning=FALSE}
+stroke2$hypertension <- gsub(0, "no", stroke2$hypertension)
+stroke2$hypertension <- gsub(1, "yes", stroke2$hypertension)
+stroke2$hypertension<- as.character(stroke2$hypertension)
+stroke2$heart_disease <- gsub(0, "no", stroke2$heart_disease)
+stroke2$heart_disease <- gsub(1, "yes", stroke2$heart_disease)
+stroke2$heart_disease <- as.character(stroke2$heart_disease)
+stroke2$stroke <- gsub(0, "no", stroke2$stroke)
+stroke2$stroke <- gsub(1, "yes", stroke2$stroke)
+stroke2$stroke <- as.character(stroke2$stroke)
+```
+
+## ***3. Lưu bộ dữ liệu mới stroke2 ra excel để sử dụng cho các phần tiếp theo***
+```{r message=FALSE, warning=FALSE}
+library(writexl)
+writexl::write_xlsx(stroke2, path = "./stroke2.xlsx")
+```
+
+-- Xem dữ liệu mới stroke2 
+```{r}
+kable(stroke2[1:7, ], caption = "STROKE2")
+```
+
+## ***4. Giới thiệu bộ dữ liệu mới stroke2 và một số phép tính cơ bản***
+### *a. Giới thiệu bộ dữ liệu*
+-- Số dòng (quan sát) và cột (biến) của dữ liệu 
+```{r message=FALSE, warning=FALSE}
+dim(stroke2)
+```
+Bộ dữ liệu có 4908 quan sát và 12 biến tương ứng có 4908 dòng và 12 cột 
+
+-- Cấu trúc bộ dữ liệu 
+```{r message=FALSE, warning=FALSE}
+str(stroke2)
+```
+Có 3 biến numeric: age,  avg_glucose_level,  bmi  
+Có 8 biến character: gender, hypertension, heart_disease, ever_married, work_type, residence_type, smoking_status, stroke  
+Có 1 biến int: id
+
+-- Tên các cột 
+```{r  message=FALSE, warning=FALSE}
+names(stroke2)
+```
+-- Số lượng giới tính nam và nữ
+```{r  message=FALSE, warning=FALSE}
+table(stroke2$gender)
+```
+-- Tiền sử mắc bệnh huyết áp 
+```{r  message=FALSE, warning=FALSE}
+table(stroke2$hypertension)
+```
+-- Tiền sử mắc bệnh tim mạch 
+```{r message=FALSE, warning=FALSE}
+table(stroke2$heart_disease)
+```
+-- Tình trạng kết hôn
+```{r message=FALSE, warning=FALSE}
+table(stroke2$ever_married) 
+```
+-- Tình trạng công việc 
+```{r message=FALSE, warning=FALSE}
+table(stroke2$work_type)
+```
+-- Khu vực sinh sống
+```{r message=FALSE, warning=FALSE }
+table(stroke2$residence_type)
+```
+-- Tình trạng hút thuốc
+```{r  message=FALSE, warning=FALSE }
+table(stroke2$smoking_status) 
+```
+-- Số người từng bị đột quỵ
+```{r message=FALSE, warning=FALSE}
+table(stroke2$stroke)
+```
+-- Từ chỉ số avg_glucose_level xác định tình trạng bệnh tiểu đường của mỗi người 
+```{r message=FALSE, warning=FALSE}
+stroke55 <- mutate(stroke2, 
+            avg_glucose_level_1 = case_when(avg_glucose_level < 140 ~ "Normal", 
+                                            avg_glucose_level >= 140 & avg_glucose_level < 200 ~ "High", 
+                                            avg_glucose_level >=200 ~ "Very High"), .before = 9)
+```
+
+-- Tình trạng bệnh tiểu đường của mỗi người
+```{r message=FALSE, warning=FALSE}
+table(stroke55$avg_glucose_level_1)
+```
+-- Trong đó, tình trạng bệnh tiểu đường tại nam
+```{r message=FALSE, warning=FALSE}
+stroke56 <- subset(stroke55, gender != "Female")
+table(stroke56$avg_glucose_level_1)
+```
+-- Tình trạng bệnh tiểu đường tại nữ 
+```{r message=FALSE, warning=FALSE}
+stroke57 <- subset(stroke55, gender !="Male")
+table(stroke57$avg_glucose_level_1)
+```
+-- Từ chỉ số bmi xác định tình trạng cân nặng mỗi người 
+```{r message=FALSE, warning=FALSE}
+stroke55 <- mutate(stroke55, 
+                   bmi_1 = case_when(bmi < 18.5 ~ "Lank", 
+                                     bmi >=18.5 & bmi <= 24.9 ~ "Thin",
+                                     bmi >=25 & bmi <= 29.9 ~ "Over",
+                                     bmi >= 30 ~ "Fat"), .before = 11)
+```
+
+-- Tình trạng cân nặng mỗi người
+```{r message=FALSE, warning=FALSE}
+table(stroke55$bmi_1)
+```
+-- Trong đó tình trạng cân nặng của nam giới
+```{r message=FALSE, warning=FALSE}
+stroke58 <- subset(stroke55, gender != "Female")
+table(stroke58$bmi_1)
+```
+-- Tình trạng cân nặng tại nữ
+```{r message=FALSE, warning=FALSE}
+stroke59<-subset(stroke55, gender!="Male")
+table(stroke59$bmi_1)
+```
+
+### *b. Một số phép tính cơ bản*
+-- Tính mean, median, min, max, phương sai, độ lệch chuẩn cho 3 biến age, avg_glucose_level và bmi   
+
+*age*
+```{r message=FALSE, warning=FALSE}
+summary(stroke2$age)
+```
+```{r message=FALSE, warning=FALSE}
+summarise(stroke2, var(age), sd(age))
+```
+
+*avg_glucose_level*
+```{r message=FALSE, warning=FALSE}
+summary(stroke2$avg_glucose_level)
+```
+```{r message=FALSE, warning=FALSE}
+summarise(stroke2, var(avg_glucose_level), sd(avg_glucose_level))
+```
+*bmi*
+```{r message=FALSE, warning=FALSE}
+summary(stroke2$bmi)
+```
+```{r message=FALSE, warning=FALSE}
+summarise(stroke2, var(bmi), sd(bmi))
+```
+
+-- Tính mean, median, min, max của age, avg_glucose_level và bmi theo giới tính 
+
+*Nam*
+```{r message=FALSE, warning=FALSE}
+stroke3<-subset(stroke1, gender!="Female")
+summary(stroke3$age)
+summary(stroke3$avg_glucose_level)
+summary(stroke3$bmi)
+
+```
+*Nữ*
+```{r message=FALSE, warning=FALSE}
+stroke4<-subset(stroke1, gender!="Male") 
+summary(stroke4$age)
+summary(stroke4$avg_glucose_level)
+summary(stroke4$bmi)
+```
+# **II. TIỀN XỬ LÝ DỮ LIỆU** 
+## ***1. Vẽ boxplot***
+```{r message=FALSE, warning=FALSE}
+boxplot(stroke2$age, stroke2$avg_glucose_level, stroke2$bmi)
+```
+
+## ***2. Xác định lượng biến đột xuất***
+### *a. Cột age*
+```{r message=FALSE, warning=FALSE}
+outlier <- boxplot.stats(stroke2$age)$out %>% 
+  sort()
+print(outlier)
+```
+Như vậy, trong cột age không có lượng biến đột xuất  
+
+### *b. Cột avg_glucose_level*
+```{r message=FALSE, warning=FALSE}
+outlier <- boxplot.stats(stroke2$avg_glucose_level)$out %>% 
+  sort()
+print(outlier)
+```
+Cột avg_glucose_level có lượng biến đột xuất
+
+-- Thay giá trị biến đột xuất bằng trung vị median
+```{r message=FALSE, warning=FALSE}
+stroke6 <- stroke2 %>% 
+  mutate(avg_glucose_level = case_when(avg_glucose_level>=outlier[1] ~ median(avg_glucose_level),
+                                       avg_glucose_level<outlier[1] ~ avg_glucose_level))
+```
+
+### *c. Cột bmi*
+```{r message=FALSE, warning=FALSE}
+outlier <- boxplot.stats(stroke2$bmi)$out %>% 
+  sort()
+print(outlier)
+```
+Cột bmi có lượng biến đột xuất 
+
+-- Thay giá trị biến đột xuất bằng trung vị median
+```{r}
+stroke7 <- stroke2 %>% 
+  mutate(bmi_new=case_when(bmi>=outlier[1]~median(bmi), 
+                           bmi<outlier[1]~bmi))
+```
+
+# ***3. Chuẩn hoá dữ liệu bằng phương pháp z-score***
+### *a. Theo độ lệch chuẩn*
+-- Đối với cột avg_glucose_level
+```{r message=FALSE, warning=FALSE}
+stroke8 <- mutate(stroke2,avg_glucose_level = ((avg_glucose_level - mean(avg_glucose_level))/sd(avg_glucose_level)))
+```
+
+-- Đối với cột bmi
+```{r message=FALSE, warning=FALSE}
+stroke10 <- mutate(stroke2,bmi = ((bmi - mean(bmi))/sd(bmi)))
+```
+
+### *b. Theo độ lệch tuyệt đối trung bình*
+-- Đối với cột avg_glucose_level
+```{r message=FALSE, warning=FALSE}
+stroke9 <- mutate(stroke2,avg_glucose_level = ((avg_glucose_level - mean(avg_glucose_level))/mad(avg_glucose_level)))
+```
+
+-- Đối với cột bmi 
+```{r message=FALSE, warning=FALSE}
+stroke11 <- mutate(stroke2,bmi = ((bmi - mean(bmi))/mad(bmi)))
+```
+
+# ***4. Chuẩn hoá min-max***
+-- Đối với cột avg_glucose_level
+```{r message=FALSE, warning=FALSE}
+stroke12<- mutate(stroke2, avg_glucose_level = (avg_glucose_level - min(avg_glucose_level))/(max(avg_glucose_level) - min(avg_glucose_level)))
+```
+
+-- Đối với cột bmi 
+```{r message=FALSE, warning=FALSE}
+stroke13<- mutate(stroke2, bmi = (bmi - min(bmi))/(max(bmi) - min(bmi)))
+```
+
+# **III. MỘT SỐ ĐỒ THỊ**
+## ***1. Biểu đồ mối liên hệ giữa đột quỵ và tình trạng hôn nhân***
+```{r message=FALSE, warning=FALSE}
+st1 <- ggplot(stroke2, aes(x = stroke, fill = ever_married))+
+  geom_bar(position = "fill")+
+  stat_count(geom = "text",
+             aes(label = stat(count)),
+             position = position_fill(vjust= 0.5), color = "black")+
+  ggtitle("Marital Status vs Stroke")
+st1
+```
+   
+-- Nhìn vào biểu đồ ta thấy rằng người đã kết hôn có khả năng bị đột quỵ cao hơn. 
+
+## ***2. Biểu đồ liên quan đến Glucose***  
+Glucose (còn gọi là đường) là nguồn năng lượng chính đi nuôi cơ thể, được chuyển hóa từ các loại thực phẩm mà chúng ta cung cấp cho bản thân mỗi ngày.    
+                      
+### *a. Biểu đồ boxplot Glucose*
+```{r message=FALSE, warning=FALSE}
+st2 <-  ggplot(stroke2, mapping =  aes(x = stroke, y = avg_glucose_level, fill = stroke)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Average Glucose Level vs Stroke", 
+       x = "Stroke", 
+       y = "Average Glucose Level") +
+  scale_fill_brewer(palette = "Paired")
+st2
+```
+  
+-- Từ biểu đồ hộp, chúng ta có thể thấy rằng những người từng bị đột quỵ có mức đường huyết trung bình cao hơn những người chưa từng bị đột quỵ.   
+                                 
+### *b. Biểu đồ mối liên hệ Glucose với tuổi*
+```{r message=FALSE, warning=FALSE}
+st3 <- ggplot(stroke2,aes(x=age, y = avg_glucose_level))+
+  labs( x = "Age", y ="Average Glucose Level",
+        title = " Age vs Average Glucose Level") + 
+  geom_point()
+st3
+```
+  
+-- Có một lượng lớn bệnh nhân có đường huyết trung bình là 75, một giá trị nằm trong mức trung bình của một người khỏe mạnh. Tuy nhiên nhìn vào biểu đồ ta thấy ở những bệnh nhân trong đổ tuổi từ 50 trở lên có nhiều bệnh nhân có tỷ lệ đường trong máu cao.  
+
+### *c. Biểu đồ mối liên hệ giữa lượng đường trong máu và đột quỵ*
+```{r message=FALSE, warning=FALSE}
+stroke2 %>% 
+  ggplot(aes(avg_glucose_level, fill = stroke, color = stroke)) + 
+  geom_density(alpha = 0.2)+
+  theme_light()+
+  labs(title = "An Approximation of the Relationship between Stroke Possibility and Average Glucose Level",
+       x= "Average Glucose Level",
+       caption = "Source: Kaggle")
+```
+  
+-- Chỉ số Glucose trong máu ở trạng thái bình thường là <140. Theo biểu đồ có thể thấy đa số những người chưa từng bị đột quỵ có chỉ số glucose ở mức bình thường. Tuy nhiên trái lại những người từng bị đột quỵ có chỉ số glucose > 140. Như vậy, có thể thấy chỉ số glucose có ảnh hưởng đến khả năng bị bệnh đột quỵ.  
+
+## ***3. Biểu đồ mối liên hệ giữa đột quỵ và hút thuốc lá***
+```{r message=FALSE, warning=FALSE}
+st4 <- ggplot(stroke2, aes(x = smoking_status, fill = stroke ))+
+  geom_bar(position = "fill")+
+  stat_count(geom = "text",
+             aes(label = stat(count)),
+             position = position_fill(vjust = 0.5), color = "black")+
+  ggtitle("Smoking Status vs Stroke")
+st4
+```
+  
+-- Chúng ta có thể thấy rằng tình trạng hút thuốc có ảnh hưởng đến nguy cơ bị đột quỵ.   
+
+## ***4. Biểu đồ mối liên hệ giữa loại hình công việc và đột quỵ***
+```{r  message=FALSE, warning=FALSE}
+st5<-ggplot(stroke2, aes(x = work_type, fill = stroke))+
+  geom_bar(position = "fill")+
+  stat_count(geom = "text",
+             aes(label = stat(count)),
+             position = position_fill(vjust = 0.5), color = "black")
+st5
+```
+  
+-- Mặc dù nhiều bệnh nhân ở khu vực tư nhân bị ảnh hưởng bởi đột quỵ. Tuy nhiên, trên cơ sở tỷ lệ cho từng lĩnh vực, chúng ta có thể thấy rằng bệnh nhân lao động tự do dễ bị đột quỵ hơn.  
+
+## ***5. Biểu đồ liên quan đến BMI*** 
+### *a. Biểu đồ boxplot BMI*
+```{r  message=FALSE, warning=FALSE}
+st6 <- ggplot(stroke2,mapping = aes(x = stroke, y = bmi, fill = stroke)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of BMI", 
+       x = "Stroke", 
+       y = "BMI") +
+  scale_fill_brewer(palette = "Paired")
+st6
+```
+  
+-- Qua biểu đồ hộp, ta thấy những bệnh nhân có chỉ số BMI cao dễ bị đột quỵ hơn.  
+
+### *b. Biểu đồ mối liên hệ giữa BMI và loại hình công việc*
+```{r  message=FALSE, warning=FALSE}
+stroke2 %>% 
+  ggplot(aes(x=work_type, y=bmi, fill=work_type))+
+  geom_boxplot()+
+  theme_get()+
+  labs(title = "An Approximation of the Relationship between Body Mass Index and Work Type",
+       x= "Work Type", y = "BMI",
+       caption = "Source: Kaggle")+
+  theme(legend.position = "none",
+        axis.title.y = element_text(),
+        text = element_text(),
+        panel.grid.major.x = element_blank(),
+        axis.title.x = element_blank())+
+  transition_states(work_type, wrap = FALSE)+
+  shadow_mark(alpha = 0.5)+
+  enter_grow()+
+  exit_fade()
+```
+  
+-- Qua biểu đồ ta thấy, chỉ số BMI trung bình của Govt job, Private, Self-employed là cao nhất, chỉ số BMI của children và never work lệch phải, nhất là nhân tố never work. Các điểm dữ liệu nằm ngoài phạm vi cận trên và cận dưới chính là các outliers – những quan sát bất thường. Dựa trên chỉ số BMI bình thường sẽ dao động trong khoảng 18,5 - 24,9, con số này cho thấy bạn đang ở mức cân nặng lý tưởng. Do đó có thể thấy những người đang đi làm tức Govt job, Private, Self-employed có chỉ số BMI từ 25 trở đi đều đang có dấu hiệu béo phì. Cũng dễ hiểu vì các nhân tố này tập trung chủ yếu là người trưởng thành.  
+
+# **IV. ASSOCIATION VALUE**
+-- Tạo data frame với biến gender, hyper, heart, glucose, bmi là nhân tố ảnh hưởng (hay biến độc lập), stroke là (kết quả ) hay biến phụ thuộc
+
+```{r message=FALSE, warning=FALSE}
+stroke60 <- stroke2[-c(1, 3, 6:8, 11)]
+stroke60
+stroke60 <- mutate(stroke60, avg_glucose_level=case_when(avg_glucose_level<140~"Normal",
+                                                         avg_glucose_level>=140&avg_glucose_level<200 ~"High",
+                                                         avg_glucose_level>=200 ~"Very High"))
+stroke60 <- mutate(stroke60, bmi=case_when(bmi<25~"Normal",
+                                           bmi>=25&bmi<30 ~"High",
+                                           bmi>=30 ~"Very High"))
+```
+ 
+-- Sau khi có data frame mới ta chuyển các cột dữ liệu từ dạng character(chữ) thành dạng factor
+```{r message=FALSE, warning=FALSE}
+stroke60$gender <- as.factor(stroke60$gender)
+stroke60$hypertension <- as.factor(stroke60$hypertension)
+stroke60$heart_disease <- as.factor(stroke60$heart_disease)
+stroke60$stroke <- as.factor(stroke60$stroke)
+stroke60$avg_glucose_level <- as.factor(stroke60$avg_glucose_level)
+stroke60$bmi <- as.factor(stroke60$bmi)
+```
+
+-- Cấu trúc bộ dữ liệu stroke60
+```{r message=FALSE, warning=FALSE}
+str(stroke60)
+```
+-- Tìm mối quan hệ giữa các biến
+```{r message=FALSE, warning=FALSE}
+rules=apriori(stroke60, control = list(verbose=F),
+              parameter = list(minlen=5,
+                               support=0.01,
+                               conf=0.5),
+              appearance = list(rhs=c("stroke=yes",
+                                      "stroke=no"),
+                                default="lhs"))
+quality(rules) <- round(quality(rules), digits = 3)
+rules <- sort(rules, by="lift")
+inspect(rules)
+```
+Sau khi có kết quả, sắp xếp các quy luật theo giá trị lift, từ cao đến thấp
+
+-- Loại bỏ quy luật thừa
+```{r message=FALSE, warning=FALSE}
+redundant=is.redundant(rules,measure="confidence")
+rule2=rules[!redundant]
+inspect(rule2)
+```
+Kết quả sau khi lọc bỏ 11 quy luật thừa, còn lại 51 quy luật  
+*Nếu: Lift > 1 khi người bệnh mắc phải 1 quy luật bên trái thì khả năng không có tiền sử đột quỵ tăng giá trị lift lần*  
+*Nếu: Lift < 1 khi người bệnh mắc phải 1 quy luật bên trái thì khả năng không có tiền sử đột quỵ giảm giá trị lift lần*  
+*Nếu: Lift = 1 vế trái và vế phải tức nguyên nhân và kết quả độc lập với nhau*
+
+
+
