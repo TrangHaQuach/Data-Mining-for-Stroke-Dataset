@@ -1,2 +1,2 @@
 # Data-Mining-for-Stroke-Dataset
-Mid-term of Data Mining Class
+Mid-term Assignment of Data Mining Class
